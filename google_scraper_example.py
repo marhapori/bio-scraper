@@ -6,11 +6,13 @@ import pandas as pd
 import logging
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+
 # Logging configuration
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s'
 )
+
 
 def google_search(query, num_results=5, pause=2.0):
     """
@@ -45,6 +47,7 @@ def google_search(query, num_results=5, pause=2.0):
                 })
         time.sleep(pause)
         return results
+
     except requests.RequestException as e:
         logging.warning(
             f"Google search failed for query '{query}': {e}"
@@ -72,24 +75,29 @@ def scrape_product_info(url):
             'packaging': '',
             'description': ''
         }
-        # Ingredients
         ing = soup.find(text=lambda t: 'Összetevők' in t)
         if ing:
-            result['ingredients'] = ing.parent.get_text(separator=' ', strip=True)
-        # Effects or benefits
+            result['ingredients'] = ing.parent.get_text(
+                separator=' ', strip=True
+            )
         eff = soup.find(text=lambda t: 'Hatás' in t or 'Előny' in t)
         if eff:
-            result['effects'] = eff.parent.get_text(separator=' ', strip=True)
-        # Packaging (g or ml)
-        pkg = soup.find(text=lambda t: any(u in t for u in ['g', 'ml']))
+            result['effects'] = eff.parent.get_text(
+                separator=' ', strip=True
+            )
+        pkg = soup.find(text=lambda t: any(
+            u in t for u in ['g', 'ml']
+        ))
         if pkg:
-            result['packaging'] = pkg.parent.get_text(separator=' ', strip=True)
-        # Meta description
-        meta = soup.find('meta', attrs={'name': 'description'})
+            result['packaging'] = pkg.parent.get_text(
+                separator=' ', strip=True
+            )
+        meta = soup.find(
+            'meta', attrs={'name': 'description'}
+        )
         if meta and meta.get('content'):
             result['description'] = meta['content'].strip()
         else:
-            # Description block
             desc_div = soup.find(
                 lambda tag: (
                     tag.name in ['div', 'p']
@@ -101,11 +109,21 @@ def scrape_product_info(url):
                 )
             )
             if desc_div:
-                result['description'] = desc_div.get_text(separator=' ', strip=True)
+                result['description'] = desc_div.get_text(
+                    separator=' ', strip=True
+                )
         return result
+
     except requests.RequestException as e:
-        logging.warning(f"Scraping failed for URL {url}: {e}")
-        return result
+        logging.warning(
+            f"Scraping failed for URL {url}: {e}"
+        )
+        return {
+            'ingredients': '',
+            'effects': '',
+            'packaging': '',
+            'description': ''
+        }
 
 
 def fetch_bionaturorganikus(ean):
@@ -130,9 +148,8 @@ def fetch_bionaturorganikus(ean):
 
 def fetch_product_data(ean):
     """
-    Main orchestration: first search termszetes.com/en, then fallback to bionaturorganikus.hu.
+    Main orchestration: first search termeszetes.com/en, then fallback to bionaturorganikus.hu.
     """
-    # Primary: termeszetes.com/en
     primary_query = f"site:termeszetes.com/en {ean}"
     results = google_search(primary_query, num_results=3)
     if results:
@@ -144,20 +161,27 @@ def fetch_product_data(ean):
             'link': first['link'],
             **scraped
         }
-        # If key fields missing, fallback
         if not data['description'] or not data['ingredients']:
             fallback = fetch_bionaturorganikus(ean)
             if fallback:
-                for key in ['title', 'description', 'ingredients', 'effects', 'packaging', 'link']:
+                for key in [
+                    'title', 'description', 'ingredients',
+                    'effects', 'packaging', 'link'
+                ]:
                     if not data.get(key) and fallback.get(key):
                         data[key] = fallback[key]
         return data
-    # Fallback if no primary results
     fallback = fetch_bionaturorganikus(ean)
     if fallback:
         return {'EAN': ean, **fallback}
-    logging.error(f"Data collection failed for EAN: {ean}")
-    return {'EAN': ean, 'title': '', 'link': '', 'ingredients': '', 'effects': '', 'packaging': '', 'description': ''}
+    logging.error(
+        f"Data collection failed for EAN: {ean}"
+    )
+    return {
+        'EAN': ean, 'title': '', 'link': '',
+        'ingredients': '', 'effects': '',
+        'packaging': '', 'description': ''
+    }
 
 
 def main():
@@ -167,12 +191,19 @@ def main():
     records = []
     for idx, row in df.iterrows():
         ean = row['EAN']
-        logging.info(f"Processing {ean} ({idx+1}/{len(df)})")
+        logging.info(
+            f"Processing {ean} ({idx+1}/{len(df)})"
+        )
         records.append(fetch_product_data(ean))
     raw_df = pd.DataFrame(records)
-    raw_df.to_csv('product_data_raw.csv', index=False)
+    raw_df.to_csv(
+        'product_data_raw.csv', index=False
+    )
     logging.info("Raw data saved to product_data_raw.csv")
-    env = Environment(loader=FileSystemLoader('.'), autoescape=select_autoescape(['html']))
+    env = Environment(
+        loader=FileSystemLoader('.'),
+        autoescape=select_autoescape(['html'])
+    )
     template = env.get_template('description_template.html')
     descriptions = []
     for _, prod in raw_df.iterrows():
@@ -185,8 +216,11 @@ def main():
         )
         descriptions.append(html)
     raw_df['DescriptionHTML'] = descriptions
-    raw_df.to_csv('product_data_with_descriptions.csv', index=False)
+    raw_df.to_csv(
+        'product_data_with_descriptions.csv', index=False
+    )
     logging.info("Descriptions saved to product_data_with_descriptions.csv")
+
 
 if __name__ == '__main__':
     main()
