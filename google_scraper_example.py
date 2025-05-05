@@ -76,22 +76,45 @@ def scrape_product_info(url):
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         result = {'ingredients': '', 'effects': '', 'packaging': '', 'description': ''}
+
+        # Összetevők
         ing = soup.find(text=lambda t: 'Összetevők' in t)
         if ing:
             result['ingredients'] = ing.parent.get_text(separator=' ', strip=True)
+
+        # Hatások vagy előnyök
         effect = soup.find(text=lambda t: 'Hatás' in t or 'Előny' in t)
         if effect:
             result['effects'] = effect.parent.get_text(separator=' ', strip=True)
+
+        # Kiszerelés
         pack = soup.find(text=lambda t: any(unit in t for unit in ['g', 'ml']))
         if pack:
             result['packaging'] = pack.parent.get_text(separator=' ', strip=True)
+
+        # Meta leírás
         meta = soup.find('meta', attrs={'name': 'description'})
         if meta and meta.get('content'):
             result['description'] = meta['content'].strip()
         else:
-            desc_div = soup.find(lambda tag: tag.name in ['div', 'p'] and tag.get('class') and any('description' in c.lower() for c in tag.get('class')))
+            # Termékleírás blokk keresése
+            desc_div = soup.find(
+                lambda tag: (
+                    tag.name in ['div', 'p']
+                    and tag.get('class')
+                    and any(
+                        'description' in c.lower()
+                        for c in tag.get('class')
+                    )
+                )
+            )
             if desc_div:
-                result['description'] = desc_div.get_text(separator=' ', strip=True)
+                result['description'] = (
+                    desc_div.get_text(
+                        separator=' ',
+                        strip=True
+                    )
+                )
         return result
     except requests.RequestException as e:
         logging.warning(f"Scraping sikertelen {url}: {e}")
@@ -102,13 +125,11 @@ def fetch_product_data(ean):
     """
     Összefogja Google keresést, scrapinget, és ha kell, OpenFoodFacts fallback-et.
     """
-    # 1) Google-scraping
     results = google_search(ean, num_results=3)
     if results:
         first = results[0]
         scraped = scrape_product_info(first['link'])
         data = {'EAN': ean, 'title': first['title'], 'link': first['link'], **scraped}
-        # Ha fontos mezők hiányoznak, fallback
         if not data['description'] or not data['ingredients']:
             off = fetch_openfoodfacts(ean)
             if off:
@@ -116,11 +137,9 @@ def fetch_product_data(ean):
                     if not data.get(key) and off.get(key):
                         data[key] = off[key]
         return data
-    # 2) Fallback OpenFoodFacts ha Google sem hozott eredményt
     off = fetch_openfoodfacts(ean)
     if off:
         return {'EAN': ean, **off}
-    # 3) Teljes sikertelenség
     logging.error(f"Adatgyűjtés sikertelen EAN: {ean}")
     return {'EAN': ean, 'title': '', 'link': '', 'ingredients': '', 'effects': '', 'packaging': '', 'description': ''}
 
