@@ -1,4 +1,3 @@
-
 import requests
 from bs4 import BeautifulSoup
 import urllib.parse
@@ -90,16 +89,7 @@ def scrape_product_info(url):
         if meta and meta.get('content'):
             result['description'] = meta['content'].strip()
         else:
-            desc_div = soup.find(
-    lambda tag: (
-        tag.name in ['div', 'p']
-        and tag.get('class')
-        and any(
-            'description' in c.lower()
-            for c in tag.get('class')
-        )
-    )
-)
+            desc_div = soup.find(lambda tag: tag.name in ['div', 'p'] and tag.get('class') and any('description' in c.lower() for c in tag.get('class')))
             if desc_div:
                 result['description'] = desc_div.get_text(separator=' ', strip=True)
         return result
