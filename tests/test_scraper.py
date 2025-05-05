@@ -2,20 +2,25 @@
 import os
 import sys
 
-# A projekt gyökere (a tests mappa egy szinttel feljebb)
+# Projekt gyökerének felvétele a modulkereső útvonalra
 sys.path.insert(
     0,
-    os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    os.path.abspath(os.path.join(os.path.dirname(__file__), '..')),
 )
 
-from google_scraper_example import fetch_product_data
-
+from google_scraper_example import (
+    fetch_product_data,
+    search_termeszetes,
+    scrape_product_info,
+)
 
 def test_fetch_product_data_opensuccess(mocker):
+    # Mockoljuk a belső keresőt: adjon vissza címet és linket
     mocker.patch(
-        'google_scraper_example.google_search',
-        return_value=[{'title': 'Termék', 'link': 'http://example.com'}],
+        'google_scraper_example.search_termeszetes',
+        return_value=('Termék', 'http://example.com'),
     )
+    # Mockoljuk a scrapinget: adja vissza a mezőket
     mocker.patch(
         'google_scraper_example.scrape_product_info',
         return_value={
@@ -26,7 +31,8 @@ def test_fetch_product_data_opensuccess(mocker):
         },
     )
 
-    data = fetch_product_data('1234567890123')
+    # Most már két paraméterrel hívjuk: EAN és terméknév
+    data = fetch_product_data('1234567890123', 'TestProduct')
 
     assert data['title'] == 'Termék'
     assert 'Összetétel' in data['ingredients']
