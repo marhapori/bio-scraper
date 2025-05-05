@@ -1,3 +1,12 @@
+import os
+import sys
+
+# A projekt gyökere (a tests mappa egy szinttel feljebb)
+sys.path.insert(
+    0,
+    os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+)
+
 from google_scraper_example import fetch_product_data
 
 
